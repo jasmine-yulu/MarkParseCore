@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--
+  MarkParse Core 浏览器 Demo
+  - 从 textarea 读取 Markdown 文本，调用 `parseToAst` 生成 AST，再用 `renderHtml` 渲染到右侧。
+  - 同时展示性能指标: 总耗时、处理字节、各阶段耗时。
+  - 依赖 dist 构建产物: `../dist/core/parser.js` 与 `../dist/renderer/html.js`。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarkParse Core Demo</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 0; padding: 0; display: flex; height: 100vh; }
+    .left { width: 50%; padding: 16px; box-sizing: border-box; border-right: 1px solid #eee; display: flex; flex-direction: column; }
+    .right { width: 50%; padding: 16px; box-sizing: border-box; overflow: auto; }
+    textarea { flex: 1; width: 100%; resize: none; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 14px; line-height: 1.5; }
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .metrics { color: #555; font-size: 12px; }
+    pre { background: #f6f8fa; padding: 12px; overflow: auto; }
+    table { border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #e5e7eb; padding: 6px 10px; }
+    thead th { background: #f9fafb; font-weight: 600; }
+  </style>
+  <script type="module">
+    import { parseToAst } from '../dist/core/parser.js';
+    import { renderHtml } from '../dist/renderer/html.js';
+    
+    const inputEl = document.getElementById('input');
+    const outputEl = document.getElementById('output');
+    const metricsEl = document.getElementById('metrics');
+    const btn = document.getElementById('btn');
+
+    function formatMs(ms) {
+      return `${ms.toFixed(2)} ms (${(ms / 1000).toFixed(3)} s)`;
+    }
+
+    function run() {
+      const input = inputEl.value;
+      // warmup + N runs average to reduce jitter
+      const N = 5;
+      // warmup
+      parseToAst(input, { enableFencedCode: true });
+      let total = 0;
+      const accumPhases = {};
+      for (let i = 0; i < N; i++) {
+        const { ast, metrics } = parseToAst(input, { enableFencedCode: true });
+        if (i === N - 1) {
+          // render the last AST only
+          outputEl.innerHTML = renderHtml(ast);
+        }
+        total += metrics.totalMs;
+        for (const [k, v] of Object.entries(metrics.phases)) {
+          accumPhases[k] = (accumPhases[k] || 0) + v;
+        }
+      }
+      const avg = total / N;
+      const phases = Object.entries(accumPhases)
+        .map(([k, v]) => `${k}: ${formatMs(v / N)}`)
+        .join(' | ');
+      const bytes = input.length * 2;
+      metricsEl.textContent = `平均耗时(${N}次): ${formatMs(avg)} | 字节: ${bytes} | 分阶段均值: ${phases}`;
+    }
+
+    btn.addEventListener('click', run);
+    inputEl.addEventListener('input', run);
+
+    inputEl.value = `# MarkParse Core Demo\n\n- 粘贴或输入 Markdown\n- 左侧输入，右侧输出 HTML\n\n\`\`\`ts\nconsole.log('fenced code');\n\`\`\``.replaceAll('\\`\\`\\`', '```');
+    run();
+  </script>
+</head>
+<body>
+  <div class="left">
+    <div class="toolbar">
+      <button id="btn">解析</button>
+      <span id="metrics" class="metrics"></span>
+    </div>
+    <textarea id="input" placeholder="在此粘贴 Markdown..."></textarea>
+  </div>
+  <div class="right" id="output"></div>
+</body>
+</html>
+
+

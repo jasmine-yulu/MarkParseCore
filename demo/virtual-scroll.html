@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!--
+  MarkParse Core 虚拟滚动 Demo
+  - 展示大文档的虚拟滚动渲染效果
+  - 对比普通渲染和虚拟滚动的性能差异
+  - 支持实时切换渲染模式
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarkParse Core 虚拟滚动 Demo</title>
+  <style>
+    body { 
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; 
+      margin: 0; 
+      padding: 0; 
+      display: flex; 
+      height: 100vh; 
+      background: #f8f9fa;
+    }
+    
+    .left { 
+      width: 50%; 
+      padding: 16px; 
+      box-sizing: border-box; 
+      border-right: 1px solid #e5e7eb; 
+      display: flex; 
+      flex-direction: column; 
+      background: white;
+    }
+    
+    .right { 
+      width: 50%; 
+      padding: 16px; 
+      box-sizing: border-box; 
+      display: flex; 
+      flex-direction: column;
+      background: white;
+    }
+    
+    .toolbar { 
+      display: flex; 
+      align-items: center; 
+      gap: 12px; 
+      margin-bottom: 16px; 
+      padding: 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+    }
+    
+    .metrics { 
+      color: #6b7280; 
+      font-size: 12px; 
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    button:hover {
+      background: #f9fafb;
+      border-color: #9ca3af;
+    }
+    
+    button.active {
+      background: #3b82f6;
+      color: white;
+      border-color: #3b82f6;
+    }
+    
+    select {
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+    }
+    
+    textarea { 
+      flex: 1; 
+      width: 100%; 
+      resize: none; 
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+      font-size: 14px; 
+      line-height: 1.5; 
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    
+    .render-area {
+      flex: 1;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .render-area.normal {
+      overflow-y: auto;
+    }
+    
+    .render-area.virtual {
+      overflow: hidden;
+    }
+    
+    .render-content {
+      padding: 16px;
+      line-height: 1.6;
+    }
+    
+    .render-content h1, .render-content h2, .render-content h3 {
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    
+    .render-content h1 { font-size: 24px; }
+    .render-content h2 { font-size: 20px; }
+    .render-content h3 { font-size: 18px; }
+    
+    .render-content p {
+      margin-bottom: 16px;
+    }
+    
+    .render-content pre {
+      background: #f6f8fa;
+      padding: 12px;
+      border-radius: 6px;
+      overflow: auto;
+      margin: 16px 0;
+    }
+    
+    .render-content table {
+      border-collapse: collapse;
+      margin: 16px 0;
+      width: 100%;
+    }
+    
+    .render-content th, .render-content td {
+      border: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    
+    .render-content thead th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+    
+    .render-content blockquote {
+      border-left: 4px solid #e5e7eb;
+      padding-left: 16px;
+      margin: 16px 0;
+      color: #6b7280;
+    }
+    
+    .render-content ul, .render-content ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+    
+    .render-content li {
+      margin-bottom: 8px;
+    }
+    
+    .status {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    
+    .performance-chart {
+      margin-top: 16px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    
+    .chart-bar {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .chart-label {
+      width: 120px;
+      font-weight: 500;
+    }
+    
+    .chart-value {
+      flex: 1;
+      height: 20px;
+      background: #e5e7eb;
+      border-radius: 10px;
+      position: relative;
+      margin: 0 8px;
+    }
+    
+    .chart-fill {
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 10px;
+      transition: width 0.3s ease;
+    }
+    
+    .chart-number {
+      width: 80px;
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    
+    .mode-indicator {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+    
+    .mode-normal {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .mode-virtual {
+      background: #dcfce7;
+      color: #166534;
+    }
+  </style>
+  <script type="module">
+    import { parseToAst } from '../dist/core/parser.js';
+    import { renderHtml } from '../dist/renderer/html.js';
+    import { createVirtualScrollRenderer, VirtualScrollPresets } from '../dist/virtual-scroll/index.js';
+    
+    const inputEl = document.getElementById('input');
+    const outputEl = document.getElementById('output');
+    const metricsEl = document.getElementById('metrics');
+    const modeSelect = document.getElementById('mode');
+    const presetSelect = document.getElementById('preset');
+    const generateBtn = document.getElementById('generate');
+    const parseBtn = document.getElementById('parse');
+    const statusEl = document.getElementById('status');
+    const performanceEl = document.getElementById('performance');
+    const domMonitorEl = document.getElementById('dom-monitor');
+    const totalDomEl = document.getElementById('total-dom');
+    const outputDomEl = document.getElementById('output-dom');
+    const visibleDomEl = document.getElementById('visible-dom');
+
+    let currentRenderer = null;
+    let currentMode = 'normal';
+    let performanceData = {
+      normal: { parseTime: 0, renderTime: 0, memoryUsage: 0 },
+      virtual: { parseTime: 0, renderTime: 0, memoryUsage: 0 }
+    };
+    
+    // 稳定性测试数据
+    let stabilityTestData = {
+      normal: { times: [], avg: 0, variance: 0 },
+      virtual: { times: [], avg: 0, variance: 0 }
+    };
+
+    function formatMs(ms) {
+      return `${ms.toFixed(2)} ms`;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function generateLargeDocument() {
+      // 清空输入框，让用户自己输入内容
+      inputEl.value = '';
+      updateStatus('请输入您的Markdown内容进行测试');
+    }
+
+    function parseAndRender() {
+      const input = inputEl.value;
+      if (!input.trim()) {
+        updateStatus('请输入Markdown内容');
+        return;
+      }
+
+      const startTime = performance.now();
+      
+      // 解析
+      const { ast, metrics } = parseToAst(input, { enableFencedCode: true });
+      const parseTime = performance.now() - startTime;
+      
+      updateStatus(`解析完成: ${formatMs(parseTime)}`);
+      
+      // 渲染
+      const renderStartTime = performance.now();
+      
+      if (currentMode === 'normal') {
+        renderNormal(ast);
+      } else {
+        renderVirtual(ast);
+      }
+      
+      const renderTime = performance.now() - renderStartTime;
+      
+      // 更新性能数据
+      performanceData[currentMode].parseTime = parseTime;
+      performanceData[currentMode].renderTime = renderTime;
+      
+      // 计算实际DOM内存使用
+      const domCount = outputEl.querySelectorAll('*').length;
+      const textContent = outputEl.textContent || '';
+      performanceData[currentMode].memoryUsage = domCount * 100 + textContent.length * 2; // 估算DOM内存
+      
+      updateMetrics(metrics, parseTime, renderTime);
+      updatePerformanceChart();
+    }
+
+    function renderNormal(ast) {
+      const html = renderHtml(ast);
+      outputEl.innerHTML = `<div class="render-content">${html}</div>`;
+      outputEl.className = 'render-area normal';
+      
+      // 销毁虚拟滚动渲染器
+      if (currentRenderer) {
+        currentRenderer.destroy();
+        currentRenderer = null;
+      }
+    }
+
+    function renderVirtual(ast) {
+      // 销毁之前的渲染器
+      if (currentRenderer) {
+        currentRenderer.destroy();
+      }
+      
+      // 清空容器
+      outputEl.innerHTML = '';
+      outputEl.className = 'render-area virtual';
+      
+      // 获取预设配置
+      const preset = presetSelect.value;
+      const presetConfig = VirtualScrollPresets[preset];
+      
+      // 创建虚拟滚动渲染器
+      currentRenderer = createVirtualScrollRenderer({
+        ...presetConfig,
+        containerHeight: outputEl.offsetHeight,
+        className: 'virtual-scroll-container',
+        debug: true
+      });
+      
+      // 初始化渲染
+      currentRenderer.init(outputEl, ast);
+      
+      updateStatus(`虚拟滚动已启用 (${preset} 模式)`);
+    }
+
+    function updateMetrics(metrics, parseTime, renderTime) {
+      const phases = Object.entries(metrics.phases)
+        .map(([k, v]) => `${k}: ${formatMs(v)}`)
+        .join(' | ');
+      
+      // 获取DOM元素数量
+      const domCount = document.querySelectorAll('*').length;
+      const outputDomCount = outputEl.querySelectorAll('*').length;
+      
+      metricsEl.textContent = `解析: ${formatMs(parseTime)} | 渲染: ${formatMs(renderTime)} | DOM总数: ${domCount} | 输出DOM: ${outputDomCount} | 分阶段: ${phases}`;
+    }
+
+    function updateDomMonitor() {
+      // DOM监控功能已禁用，跳过更新
+      return;
+    }
+
+    function updateStatus(message) {
+      const modeText = currentMode === 'normal' ? '普通渲染' : '虚拟滚动';
+      const modeClass = currentMode === 'normal' ? 'mode-normal' : 'mode-virtual';
+      statusEl.innerHTML = `${message} <span class="mode-indicator ${modeClass}">${modeText}</span>`;
+      setTimeout(() => {
+        statusEl.innerHTML = `<span class="mode-indicator ${modeClass}">${modeText}</span>`;
+      }, 3000);
+      
+      // 更新DOM监控
+      setTimeout(updateDomMonitor, 100);
+    }
+
+    function updatePerformanceChart() {
+      const normal = performanceData.normal;
+      const virtual = performanceData.virtual;
+      
+      // 只有当两种模式都有数据时才显示对比
+      if (normal.parseTime === 0 && virtual.parseTime === 0) {
+        performanceEl.innerHTML = `
+          <div style="font-weight: 600; margin-bottom: 12px;">性能对比</div>
+          <div style="color: #6b7280; font-size: 11px; margin-bottom: 8px;">请分别测试普通渲染和虚拟滚动模式来查看性能对比</div>
+        `;
+        return;
+      }
+      
+      const maxParseTime = Math.max(normal.parseTime || 1, virtual.parseTime || 1);
+      const maxRenderTime = Math.max(normal.renderTime || 1, virtual.renderTime || 1);
+      const maxMemory = Math.max(normal.memoryUsage || 1, virtual.memoryUsage || 1);
+      
+      performanceEl.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 12px;">性能对比</div>
+        <div style="color: #6b7280; font-size: 11px; margin-bottom: 16px;">普通渲染 (蓝色) vs 虚拟滚动 (绿色)</div>
+        
+        <div style="background: #f0f9ff; padding: 8px; border-radius: 4px; margin-bottom: 12px;">
+          <div style="font-weight: 500; color: #1e40af; margin-bottom: 8px;">📊 普通渲染模式</div>
+          <div class="chart-bar">
+            <div class="chart-label">解析时间</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${normal.parseTime ? (normal.parseTime / maxParseTime) * 100 : 0}%"></div>
+            </div>
+            <div class="chart-number">${normal.parseTime ? formatMs(normal.parseTime) : '未测试'}</div>
+          </div>
+          <div class="chart-bar">
+            <div class="chart-label">渲染时间</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${normal.renderTime ? (normal.renderTime / maxRenderTime) * 100 : 0}%"></div>
+            </div>
+            <div class="chart-number">${normal.renderTime ? formatMs(normal.renderTime) : '未测试'}</div>
+          </div>
+          <div class="chart-bar">
+            <div class="chart-label">内存使用</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${normal.memoryUsage ? (normal.memoryUsage / maxMemory) * 100 : 0}%"></div>
+            </div>
+            <div class="chart-number">${normal.memoryUsage ? formatBytes(normal.memoryUsage) : '未测试'}</div>
+          </div>
+        </div>
+        
+        <div style="background: #f0fdf4; padding: 8px; border-radius: 4px;">
+          <div style="font-weight: 500; color: #166534; margin-bottom: 8px;">🚀 虚拟滚动模式</div>
+          <div class="chart-bar">
+            <div class="chart-label">解析时间</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${virtual.parseTime ? (virtual.parseTime / maxParseTime) * 100 : 0}%; background: #10b981;"></div>
+            </div>
+            <div class="chart-number">${virtual.parseTime ? formatMs(virtual.parseTime) : '未测试'}</div>
+          </div>
+          <div class="chart-bar">
+            <div class="chart-label">渲染时间</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${virtual.renderTime ? (virtual.renderTime / maxRenderTime) * 100 : 0}%; background: #10b981;"></div>
+            </div>
+            <div class="chart-number">${virtual.renderTime ? formatMs(virtual.renderTime) : '未测试'}</div>
+          </div>
+          <div class="chart-bar">
+            <div class="chart-label">内存使用</div>
+            <div class="chart-value">
+              <div class="chart-fill" style="width: ${virtual.memoryUsage ? (virtual.memoryUsage / maxMemory) * 100 : 0}%; background: #10b981;"></div>
+            </div>
+            <div class="chart-number">${virtual.memoryUsage ? formatBytes(virtual.memoryUsage) : '未测试'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 事件监听
+    generateBtn.addEventListener('click', generateLargeDocument);
+    parseBtn.addEventListener('click', parseAndRender);
+    inputEl.addEventListener('input', parseAndRender);
+    
+    modeSelect.addEventListener('change', (e) => {
+      currentMode = e.target.value;
+      parseAndRender();
+    });
+    
+    presetSelect.addEventListener('change', () => {
+      if (currentMode === 'virtual') {
+        parseAndRender();
+      }
+    });
+
+    // 初始化
+    updateStatus('请输入Markdown内容开始测试');
+  </script>
+</head>
+<body>
+  <div class="left">
+    <div class="toolbar">
+      <div class="controls">
+        <button id="generate">清空输入</button>
+        <button id="parse">重新解析</button>
+        <select id="mode">
+          <option value="normal">普通渲染</option>
+          <option value="virtual">虚拟滚动</option>
+        </select>
+        <select id="preset">
+          <option value="document">文档模式</option>
+          <option value="editor">编辑器模式</option>
+          <option value="mobile">移动端模式</option>
+          <option value="performance">高性能模式</option>
+        </select>
+      </div>
+      <span id="metrics" class="metrics"></span>
+    </div>
+    <textarea id="input" placeholder="在此输入或粘贴 Markdown 内容..."></textarea>
+  </div>
+  <div class="right">
+    <div class="toolbar">
+      <span>渲染结果</span>
+      <div id="status" class="status"></div>
+    </div>
+    <div id="output" class="render-area"></div>
+    <div id="performance" class="performance-chart">
+      <div style="font-weight: 600; margin-bottom: 12px;">性能对比</div>
+      <div style="color: #6b7280; font-size: 11px; margin-bottom: 8px;">请分别测试普通渲染和虚拟滚动模式来查看性能对比</div>
+    </div>
+    
+    <!-- <div id="dom-monitor" class="performance-chart" style="margin-top: 12px;">
+      <div style="font-weight: 600; margin-bottom: 12px;">DOM 监控</div>
+      <div style="color: #6b7280; font-size: 11px; margin-bottom: 8px;">实时显示DOM元素数量变化</div>
+      <div id="dom-stats" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px;">
+        <div>总DOM元素: <span id="total-dom">0</span></div>
+        <div>输出区域DOM: <span id="output-dom">0</span></div>
+        <div>可见DOM元素: <span id="visible-dom">0</span></div>
+      </div>
+    </div> -->
+  </div>
+</body>
+</html>
